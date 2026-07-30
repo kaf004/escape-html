@@ -1,9 +1,109 @@
 "use client";
 
-import { Canvas, useFrame } from "@react-three/fiber";
-import { useMemo, useRef } from "react";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useExperienceStore } from "../../store/useExperienceStore";
+import type { QualityLevel } from "../../types/experience";
+
+const entityVertexShader = `
+  uniform float uTime;
+  uniform float uMotion;
+  uniform float uAnomaly;
+  varying vec3 vNormal;
+  varying vec3 vPosition;
+  varying float vDisplacement;
+
+  void main() {
+    float slowWave = sin(position.y * 4.4 + uTime * 1.25);
+    float crossWave = sin((position.x - position.z) * 5.8 - uTime * 1.7);
+    float pulse = sin(uTime * 2.1) * 0.5 + 0.5;
+    float displacement =
+      (slowWave * 0.045 + crossWave * 0.025) *
+      (1.0 + uMotion * 2.2 + uAnomaly * 0.8);
+    displacement += pulse * uMotion * 0.035;
+
+    vec3 transformed = position + normal * displacement;
+    vNormal = normalize(normalMatrix * normal);
+    vPosition = transformed;
+    vDisplacement = displacement;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(transformed, 1.0);
+  }
+`;
+
+const entityFragmentShader = `
+  uniform float uTime;
+  uniform float uMotion;
+  uniform float uAnomaly;
+  varying vec3 vNormal;
+  varying vec3 vPosition;
+  varying float vDisplacement;
+
+  void main() {
+    float fresnel = pow(1.0 - abs(dot(normalize(vNormal), vec3(0.0, 0.0, 1.0))), 2.4);
+    float lattice = smoothstep(0.72, 1.0, abs(sin((vPosition.x + vPosition.y) * 18.0 + uTime)));
+    vec3 deep = vec3(0.035, 0.25, 0.32);
+    vec3 ice = vec3(0.72, 0.95, 1.0);
+    vec3 color = mix(deep, ice, fresnel + lattice * 0.16 + abs(vDisplacement) * 2.0);
+    float alpha = 0.12 + fresnel * 0.46 + lattice * 0.08 + uMotion * 0.08;
+    gl_FragColor = vec4(color * (1.0 + uAnomaly * 0.35), alpha);
+  }
+`;
+
+const refractionShader = {
+  uniforms: {
+    tDiffuse: { value: null },
+    uTime: { value: 0 },
+    uIntensity: { value: 0.08 },
+    uPointer: { value: new THREE.Vector2(0.5, 0.5) },
+    uResolution: { value: new THREE.Vector2(1, 1) },
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform float uTime;
+    uniform float uIntensity;
+    uniform vec2 uPointer;
+    uniform vec2 uResolution;
+    varying vec2 vUv;
+
+    void main() {
+      vec2 aspect = vec2(uResolution.x / max(uResolution.y, 1.0), 1.0);
+      vec2 pointerDelta = (vUv - uPointer) * aspect;
+      float distanceFromPointer = length(pointerDelta);
+      float field = exp(-distanceFromPointer * 4.2);
+      float ripple = sin(distanceFromPointer * 34.0 - uTime * 2.4) * field;
+      vec2 direction = normalize(pointerDelta + vec2(0.0001));
+      vec2 warp = direction * ripple * uIntensity * 0.018;
+      warp += vec2(
+        sin(vUv.y * 42.0 + uTime * 0.55),
+        cos(vUv.x * 36.0 - uTime * 0.45)
+      ) * uIntensity * 0.0008;
+
+      float split = uIntensity * (0.0018 + field * 0.003);
+      float red = texture2D(tDiffuse, vUv + warp + direction * split).r;
+      float green = texture2D(tDiffuse, vUv + warp).g;
+      float blue = texture2D(tDiffuse, vUv + warp - direction * split).b;
+      vec3 color = vec3(red, green, blue);
+
+      float vignette = smoothstep(1.15, 0.28, length((vUv - 0.5) * vec2(1.15, 1.0)));
+      float scan = sin(vUv.y * uResolution.y * 0.5 + uTime * 3.0) * 0.007;
+      color = color * mix(0.72, 1.0, vignette) + scan * uIntensity;
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `,
+};
 
 function seededNoise(index: number, salt: number) {
   const value = Math.sin(index * 127.1 + salt * 311.7) * 43758.5453;
@@ -155,19 +255,40 @@ function FloatingFragments() {
   );
 }
 
-function DigitalLifeform() {
+function DigitalLifeform({ quality }: { quality: QualityLevel }) {
   const core = useRef<THREE.Group>(null);
+  const material = useRef<THREE.ShaderMaterial>(null);
   const clickCount = useExperienceStore((state) => state.metrics.clicks);
   const inputCharacters = useExperienceStore((state) => state.metrics.inputCharacters);
+  const uniforms = useMemo(
+    () => ({
+      uTime: { value: 0 },
+      uMotion: { value: 0 },
+      uAnomaly: { value: 0 },
+    }),
+    [],
+  );
 
   useFrame((state, delta) => {
     if (!core.current) return;
-    const speed = useExperienceStore.getState().metrics.pointerSpeed;
+    const experience = useExperienceStore.getState();
+    const speed = experience.metrics.pointerSpeed;
+    const motion = Math.min(1, speed / 1800);
     core.current.rotation.x += delta * (0.08 + Math.min(0.65, speed / 1800));
     core.current.rotation.y += delta * 0.14;
     const pulse = 1 + Math.sin(state.clock.elapsedTime * 1.15) * 0.055;
     const sharpness = Math.min(0.32, speed / 3200);
     core.current.scale.setScalar(pulse + sharpness);
+    if (material.current) {
+      material.current.uniforms.uTime.value = state.clock.elapsedTime;
+      material.current.uniforms.uMotion.value = THREE.MathUtils.damp(
+        material.current.uniforms.uMotion.value,
+        motion,
+        4,
+        delta,
+      );
+      material.current.uniforms.uAnomaly.value = experience.anomaly;
+    }
   });
 
   const branches = Math.min(12, 5 + Math.floor(clickCount / 2));
@@ -176,14 +297,15 @@ function DigitalLifeform() {
   return (
     <group ref={core} position={[0.35, 0.2, -8]}>
       <mesh>
-        <icosahedronGeometry args={[1.05, 2]} />
-        <meshPhysicalMaterial
-          color="#bbf0ff"
-          emissive="#2f9ab8"
-          emissiveIntensity={1.4}
+        <icosahedronGeometry args={[1.05, quality === "low" ? 1 : 3]} />
+        <shaderMaterial
+          ref={material}
+          uniforms={uniforms}
+          vertexShader={entityVertexShader}
+          fragmentShader={entityFragmentShader}
           transparent
-          opacity={0.32}
-          wireframe
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
         />
       </mesh>
       <mesh rotation={[Math.PI / 2, 0, 0]}>
@@ -218,8 +340,108 @@ function DigitalLifeform() {
   );
 }
 
+function PerformanceGovernor() {
+  const elapsed = useRef(0);
+  const frames = useRef(0);
+  const warmup = useRef(0);
+
+  useFrame((_, delta) => {
+    warmup.current += delta;
+    if (warmup.current < 3) return;
+
+    elapsed.current += Math.min(delta, 0.1);
+    frames.current += 1;
+    if (elapsed.current < 4) return;
+
+    const fps = frames.current / elapsed.current;
+    const state = useExperienceStore.getState();
+    const nextQuality =
+      state.device.quality === "high" && fps < 44
+        ? "medium"
+        : state.device.quality === "medium" && fps < 31
+          ? "low"
+          : state.device.quality;
+
+    if (nextQuality !== state.device.quality) {
+      state.setDevice(
+        nextQuality,
+        state.device.reducedMotion,
+        state.device.coarsePointer,
+      );
+      warmup.current = 0;
+    }
+    elapsed.current = 0;
+    frames.current = 0;
+  });
+
+  return null;
+}
+
+function SceneEffects({ quality }: { quality: Exclude<QualityLevel, "low"> }) {
+  const { gl, scene, camera, size } = useThree();
+  const composer = useRef<EffectComposer | null>(null);
+  const refraction = useRef<ShaderPass | null>(null);
+
+  useEffect(() => {
+    const nextComposer = new EffectComposer(gl);
+    nextComposer.addPass(new RenderPass(scene, camera));
+    if (quality === "high") {
+      nextComposer.addPass(
+        new UnrealBloomPass(
+          new THREE.Vector2(size.width, size.height),
+          0.24,
+          0.42,
+          0.72,
+        ),
+      );
+    }
+
+    const screenRefraction = new ShaderPass(refractionShader);
+    nextComposer.addPass(screenRefraction);
+    nextComposer.addPass(new OutputPass());
+    nextComposer.setPixelRatio(gl.getPixelRatio());
+    nextComposer.setSize(size.width, size.height);
+    composer.current = nextComposer;
+    refraction.current = screenRefraction;
+    return () => {
+      composer.current = null;
+      refraction.current = null;
+      nextComposer.dispose();
+    };
+  }, [camera, gl, quality, scene, size.height, size.width]);
+
+  useFrame((state, delta) => {
+    const pipeline = composer.current;
+    const pass = refraction.current;
+    if (!pipeline || !pass) {
+      gl.render(scene, camera);
+      return;
+    }
+    const experience = useExperienceStore.getState();
+    const motion = Math.min(1, experience.metrics.pointerSpeed / 1600);
+    pass.uniforms.uTime.value = state.clock.elapsedTime;
+    pass.uniforms.uIntensity.value =
+      0.045 +
+      experience.anomaly * 0.1 +
+      experience.fractureProgress * 0.13 +
+      motion * 0.055;
+    pass.uniforms.uPointer.value.set(
+      experience.metrics.pointer.x,
+      1 - experience.metrics.pointer.y,
+    );
+    pass.uniforms.uResolution.value.set(
+      size.width * gl.getPixelRatio(),
+      size.height * gl.getPixelRatio(),
+    );
+    pipeline.render(delta);
+  }, 1);
+
+  return null;
+}
+
 export function DigitalWorld({ visible }: { visible: boolean }) {
   const quality = useExperienceStore((state) => state.device.quality);
+  const reducedMotion = useExperienceStore((state) => state.device.reducedMotion);
   const count = quality === "high" ? 1400 : quality === "medium" ? 800 : 360;
   const dpr: number | [number, number] =
     quality === "high" ? [1, 1.7] : quality === "medium" ? [1, 1.35] : 1;
@@ -238,7 +460,9 @@ export function DigitalWorld({ visible }: { visible: boolean }) {
         <Corridor />
         <DataDust count={count} />
         <FloatingFragments />
-        <DigitalLifeform />
+        <DigitalLifeform quality={quality} />
+        <PerformanceGovernor />
+        {!reducedMotion && quality !== "low" && <SceneEffects quality={quality} />}
       </Canvas>
     </div>
   );

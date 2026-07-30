@@ -62,7 +62,11 @@ export function InteractionEngine() {
         };
 
         recordPointer(point, distance, speed, acceleration);
-        audioEngine.motion(speed, useExperienceStore.getState().anomaly);
+        audioEngine.motion(
+          speed,
+          useExperienceStore.getState().anomaly,
+          point,
+        );
         previousX = event.clientX;
         previousY = event.clientY;
         previousTime = now;
@@ -72,11 +76,12 @@ export function InteractionEngine() {
     };
 
     const onClick = (event: MouseEvent) => {
-      recordClick({
+      const point = {
         x: event.clientX / window.innerWidth,
         y: event.clientY / window.innerHeight,
-      });
-      audioEngine.pulse();
+      };
+      recordClick(point);
+      audioEngine.pulse(0.45, point);
     };
 
     const onWheel = (event: WheelEvent) => {

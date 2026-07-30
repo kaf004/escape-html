@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { type CSSProperties, useEffect } from "react";
 import { useExperienceStore } from "../../store/useExperienceStore";
 import { InteractionEngine } from "../../systems/InteractionEngine";
+import { audioEngine } from "../../systems/audioEngine";
 import { BreakPageChapter } from "../chapters/BreakPageChapter";
 import { ControlTestChapter } from "../chapters/ControlTestChapter";
 import { EscapeChapter } from "../chapters/EscapeChapter";
@@ -32,6 +33,10 @@ export function EscapeExperience() {
       setChapter("escape");
     }
   }, [setChapter]);
+
+  useEffect(() => {
+    audioEngine.setScene(chapter);
+  }, [chapter]);
 
   return (
     <main

@@ -82,3 +82,32 @@ test("ships the complete escape, identity export, and sharing stage", async () =
   assert.match(identity, /decodeIdentityProfile/);
   assert.ok(ogImage.size > 100_000);
 });
+
+test("ships the adaptive immersion rendering and spatial audio stage", async () => {
+  const [world, audio, interaction, experience] = await Promise.all([
+    readFile(
+      new URL("../components/canvas/DigitalWorld.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(new URL("../systems/audioEngine.ts", import.meta.url), "utf8"),
+    readFile(new URL("../systems/InteractionEngine.tsx", import.meta.url), "utf8"),
+    readFile(
+      new URL("../components/experience/EscapeExperience.tsx", import.meta.url),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(world, /entityVertexShader/);
+  assert.match(world, /EffectComposer/);
+  assert.match(world, /UnrealBloomPass/);
+  assert.match(world, /PerformanceGovernor/);
+  assert.match(world, /fps < 44/);
+  assert.match(world, /fps < 31/);
+  assert.match(world, /quality !== "low"/);
+  assert.match(audio, /panningModel = "HRTF"/);
+  assert.match(audio, /createConvolver/);
+  assert.match(audio, /createDynamicsCompressor/);
+  assert.match(interaction, /audioEngine\.motion\([\s\S]*point/);
+  assert.match(interaction, /audioEngine\.pulse\(0\.45, point\)/);
+  assert.match(experience, /audioEngine\.setScene\(chapter\)/);
+});
