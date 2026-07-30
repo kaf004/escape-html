@@ -1,7 +1,12 @@
 "use client";
 
-import dynamic from "next/dynamic";
-import { type CSSProperties, useEffect, useState } from "react";
+import {
+  type CSSProperties,
+  lazy,
+  Suspense,
+  useEffect,
+  useState,
+} from "react";
 import { useExperienceStore } from "../../store/useExperienceStore";
 import { InteractionEngine } from "../../systems/InteractionEngine";
 import { audioEngine } from "../../systems/audioEngine";
@@ -20,9 +25,11 @@ import { ExperienceHud } from "../ui/ExperienceHud";
 import { PointerField } from "../ui/PointerField";
 import { TraceRecovery } from "../ui/TraceRecovery";
 
-const DigitalWorld = dynamic(
-  () => import("../canvas/DigitalWorld").then((module) => module.DigitalWorld),
-  { ssr: false },
+const DigitalWorld = lazy(
+  () =>
+    import("../canvas/DigitalWorld").then((module) => ({
+      default: module.DigitalWorld,
+    })),
 );
 
 export function EscapeExperience() {
@@ -69,11 +76,15 @@ export function EscapeExperience() {
       <div className="film-grain" aria-hidden="true" />
       <PointerField />
       {worldActive && (
-        <DigitalWorld
-          visible={
-            chapter === "inside" || chapter === "escape" || fractureProgress > 0.04
-          }
-        />
+        <Suspense fallback={null}>
+          <DigitalWorld
+            visible={
+              chapter === "inside" ||
+              chapter === "escape" ||
+              fractureProgress > 0.04
+            }
+          />
+        </Suspense>
       )}
 
       <div className="chapter-stage" key={chapter}>
