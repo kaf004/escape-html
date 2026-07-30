@@ -1,20 +1,20 @@
 import assert from "node:assert/strict";
-import { access, readFile, readdir } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import test from "node:test";
 
-const developmentPreviewMeta =
-  /<meta(?=[^>]*\bname=["']codex-preview["'])(?=[^>]*\bcontent=["']development["'])[^>]*>/i;
-const templateRoot = new URL("../", import.meta.url);
-const previewRoot = new URL("../app/_sites-preview/", import.meta.url);
-
-async function render() {
+async function render(path = "/") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
   const { default: worker } = await import(workerUrl.href);
 
   return worker.fetch(
-    new Request("http://localhost/", {
-      headers: { accept: "text/html" },
+    new Request(`http://localhost${path}`, {
+      headers: {
+        accept: "text/html",
+        host: "escape.test",
+        "x-forwarded-host": "escape.test",
+        "x-forwarded-proto": "https",
+      },
     }),
     {
       ASSETS: {
@@ -28,64 +28,57 @@ async function render() {
   );
 }
 
-test("server-renders the starter loading skeleton", async () => {
+test("server-renders the finished ESCAPE.HTML entry experience", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, developmentPreviewMeta);
-  assert.match(html, /<title>Your site is taking shape<\/title>/i);
-  assert.match(html, /Building your site/);
-  assert.match(html, /Your site is taking shape/);
   assert.match(
     html,
-    /Your first version will appear here automatically when it’s ready\./,
+    /<title>ESCAPE\.HTML — An Interactive Digital Entity<\/title>/i,
   );
-  assert.doesNotMatch(html, /Codex/);
-  assert.match(html, /react-loading-skeleton/);
-  assert.match(html, /role="status"/);
+  assert.match(
+    html,
+    /Do you believe you are controlling this page\?/,
+  );
+  assert.match(html, /You opened a website\./);
+  assert.match(html, /Something else opened you\./);
+  assert.match(
+    html,
+    /<meta property="og:image" content="https:\/\/escape\.test\/og\.png"\/>/i,
+  );
+  assert.match(html, /<meta name="twitter:card" content="summary_large_image"\/>/i);
+  assert.doesNotMatch(html, /codex-preview|Building your site|Starter Project/i);
 });
 
-test("keeps the loading skeleton scoped and disposable", async () => {
-  const [preview, css, page, layout, packageJson, files] = await Promise.all([
-    readFile(new URL("SkeletonPreview.tsx", previewRoot), "utf8"),
-    readFile(new URL("preview.css", previewRoot), "utf8"),
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../package.json", import.meta.url), "utf8"),
-    readdir(previewRoot),
+test("ships the complete escape, identity export, and sharing stage", async () => {
+  const [experience, inside, escape, identity, ogImage] = await Promise.all([
+    readFile(
+      new URL("../components/experience/EscapeExperience.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../components/chapters/InsideChapter.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../components/chapters/EscapeChapter.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(new URL("../systems/identity.ts", import.meta.url), "utf8"),
+    stat(new URL("../public/og.png", import.meta.url)),
   ]);
 
-  assert.deepEqual(files.sort(), ["SkeletonPreview.tsx", "preview.css"]);
-  assert.match(preview, /from "react-loading-skeleton"/);
-  assert.match(preview, /baseColor="#eceae7"/);
-  assert.match(preview, /highlightColor="#f9f8f6"/);
-  assert.match(preview, /duration=\{2\.8\}/);
-  assert.match(preview, /sites-skeleton-search-placeholder/);
-  assert.match(packageJson, /"react-loading-skeleton": "3\.5\.0"/);
-
-  const shellIndex = preview.indexOf('className="sites-skeleton-shell"');
-  const statusIndex = preview.indexOf('className="sites-skeleton-status"');
-  assert.ok(shellIndex >= 0 && statusIndex > shellIndex);
-  assert.match(css, /position:\s*fixed/);
-  assert.match(css, /inset:\s*0/);
-  assert.match(css, /opacity:\s*0\.52/);
-  assert.match(css, /prefers-reduced-motion:\s*reduce/);
-  assert.doesNotMatch(css, /#020617|canvas|pets|progress/i);
-  assert.doesNotMatch(
-    preview,
-    /loading-spinner|status-mark|status-progress|canvas|cookie|random/i,
-  );
-
-  assert.match(page, /export const metadata:\s*Metadata/);
-  assert.match(page, /"codex-preview": "development"/);
-  assert.match(page, /<SkeletonPreview \/>/);
-  assert.match(layout, /title:\s*"Starter Project"/);
-  assert.doesNotMatch(layout, /codex-preview|_sites-preview|themeColor|\bViewport\b/);
-  assert.doesNotMatch(css, /(^|\s)(html|body)\s*\{/m);
-
-  await assert.rejects(
-    access(new URL("public/_sites-preview", templateRoot)),
-  );
+  assert.match(experience, /chapter === "escape"/);
+  assert.match(experience, /<EscapeChapter \/>/);
+  assert.match(inside, /BEGIN THE ESCAPE/);
+  assert.match(escape, /HOLD TO OPEN EXIT/);
+  assert.match(escape, /EXPORT PNG/);
+  assert.match(escape, /SHARE TRACE/);
+  assert.match(escape, /canvas\.width = 2400/);
+  assert.match(escape, /canvas\.height = 1350/);
+  assert.match(identity, /encodeIdentityProfile/);
+  assert.match(identity, /decodeIdentityProfile/);
+  assert.ok(ogImage.size > 100_000);
 });

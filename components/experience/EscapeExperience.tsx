@@ -1,11 +1,12 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import type { CSSProperties } from "react";
+import { type CSSProperties, useEffect } from "react";
 import { useExperienceStore } from "../../store/useExperienceStore";
 import { InteractionEngine } from "../../systems/InteractionEngine";
 import { BreakPageChapter } from "../chapters/BreakPageChapter";
 import { ControlTestChapter } from "../chapters/ControlTestChapter";
+import { EscapeChapter } from "../chapters/EscapeChapter";
 import { InsideChapter } from "../chapters/InsideChapter";
 import { InterfaceChapter } from "../chapters/InterfaceChapter";
 import { ResistanceChapter } from "../chapters/ResistanceChapter";
@@ -22,7 +23,15 @@ export function EscapeExperience() {
   const anomaly = useExperienceStore((state) => state.anomaly);
   const fractureProgress = useExperienceStore((state) => state.fractureProgress);
   const reducedMotion = useExperienceStore((state) => state.device.reducedMotion);
-  const worldActive = chapter === "break" || chapter === "inside";
+  const setChapter = useExperienceStore((state) => state.setChapter);
+  const worldActive =
+    chapter === "break" || chapter === "inside" || chapter === "escape";
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).has("trace")) {
+      setChapter("escape");
+    }
+  }, [setChapter]);
 
   return (
     <main
@@ -35,7 +44,11 @@ export function EscapeExperience() {
       <div className="film-grain" aria-hidden="true" />
       <PointerField />
       {worldActive && (
-        <DigitalWorld visible={chapter === "inside" || fractureProgress > 0.04} />
+        <DigitalWorld
+          visible={
+            chapter === "inside" || chapter === "escape" || fractureProgress > 0.04
+          }
+        />
       )}
 
       <div className="chapter-stage" key={chapter}>
@@ -44,6 +57,7 @@ export function EscapeExperience() {
         {chapter === "resistance" && <ResistanceChapter />}
         {chapter === "break" && <BreakPageChapter />}
         {chapter === "inside" && <InsideChapter />}
+        {chapter === "escape" && <EscapeChapter />}
       </div>
 
       <ExperienceHud />

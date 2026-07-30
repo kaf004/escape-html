@@ -53,6 +53,7 @@ interface ExperienceState {
   recordHold: (duration: number) => void;
   tickDwell: () => void;
   setFocused: (focused: boolean) => void;
+  reset: () => void;
 }
 
 export const useExperienceStore = create<ExperienceState>((set) => ({
@@ -131,4 +132,17 @@ export const useExperienceStore = create<ExperienceState>((set) => ({
     set((state) => ({
       metrics: { ...state.metrics, focused },
     })),
+  reset: () =>
+    set({
+      chapter: "interface",
+      anomaly: 0,
+      fractureProgress: 0,
+      startedAt: 0,
+      metrics: {
+        ...initialMetrics,
+        pointer: { ...initialMetrics.pointer },
+        clickPositions: [],
+        pointerTrail: [],
+      },
+    }),
 }));

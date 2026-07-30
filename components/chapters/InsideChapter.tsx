@@ -1,29 +1,12 @@
 "use client";
 
-import { useMemo } from "react";
 import { useExperienceStore } from "../../store/useExperienceStore";
-
-function classifyTrace(speed: number, clicks: number, dwell: number) {
-  if (speed > 1100) return "THE IMPATIENT ONE";
-  if (clicks > 14) return "THE DISRUPTOR";
-  if (dwell > 150) return "THE OBSERVER";
-  if (clicks < 7) return "THE CAREFUL ONE";
-  return "THE SEEKER";
-}
+import { createIdentityProfile } from "../../systems/identity";
 
 export function InsideChapter() {
   const metrics = useExperienceStore((state) => state.metrics);
-  const traceType = classifyTrace(
-    metrics.maxPointerSpeed,
-    metrics.clicks,
-    metrics.dwellTime,
-  );
-  const traceId = useMemo(() => {
-    const seed = Math.round(
-      metrics.pointerDistance + metrics.maxPointerSpeed * 3 + metrics.clicks * 7919,
-    );
-    return `EH-${Math.abs(seed).toString(36).toUpperCase().padStart(7, "0").slice(-7)}`;
-  }, [metrics.clicks, metrics.maxPointerSpeed, metrics.pointerDistance]);
+  const setChapter = useExperienceStore((state) => state.setChapter);
+  const profile = createIdentityProfile(metrics);
 
   return (
     <section className="chapter inside-chapter" aria-labelledby="inside-title">
@@ -46,7 +29,7 @@ export function InsideChapter() {
         <dl>
           <div>
             <dt>TRACE TYPE</dt>
-            <dd>{traceType}</dd>
+            <dd>{profile.designation}</dd>
           </div>
           <div>
             <dt>POINTER DISTANCE</dt>
@@ -58,7 +41,7 @@ export function InsideChapter() {
           </div>
           <div>
             <dt>ENTITY ID</dt>
-            <dd>{traceId}</dd>
+            <dd>{profile.entityId}</dd>
           </div>
         </dl>
       </div>
@@ -73,9 +56,13 @@ export function InsideChapter() {
 
       <footer className="inside-footer">
         <p>THE ESCAPE SEQUENCE IS FORMING.</p>
-        <button type="button" className="continue-development">
-          CONTINUE DEVELOPMENT
-          <span>PROTOTYPE END / 05:42</span>
+        <button
+          type="button"
+          className="continue-development"
+          onClick={() => setChapter("escape")}
+        >
+          BEGIN THE ESCAPE
+          <span>FINAL SEQUENCE / CHAPTER 06</span>
         </button>
       </footer>
     </section>

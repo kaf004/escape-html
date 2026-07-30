@@ -23,7 +23,7 @@ export function ExperienceHud() {
   const setFractureProgress = useExperienceStore((state) => state.setFractureProgress);
   const [controlsOpen, setControlsOpen] = useState(false);
 
-  if (chapter === "interface") return null;
+  if (chapter === "interface" || chapter === "escape") return null;
 
   return (
     <aside className="experience-hud" aria-label="Experience controls">
