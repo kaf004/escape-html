@@ -1,0 +1,50 @@
+# ESCAPE.HTML
+
+> You opened a website. Something else opened you.
+
+一个运行在浏览器中的互动电影与数字艺术原型。首个展示版聚焦约三分钟的核心体验：极简入口、行为校准、界面反抗、二维页面破裂，以及进入 WebGL 数字建筑后与行为生成生命体的第一次接触。
+
+## 运行
+
+环境要求：Node.js 22.13 或更高版本。
+
+```bash
+npm install
+npm run dev
+```
+
+生产构建：
+
+```bash
+npm run build
+npm run start
+```
+
+代码检查：
+
+```bash
+npm run lint
+```
+
+## 已实现
+
+- 五段连续章节状态与可访问的跳过动态选项
+- 集中的 Interaction Engine，统一记录指针、速度、加速度、点击、滚轮、输入、长按、停留与窗口焦点
+- 仅保存在浏览器本地的行为痕迹
+- Web Audio API 程序化环境声、点击脉冲与破裂声
+- 指针速度驱动的文字散射、按钮躲避、重排输入、掉落词语与逐级异常
+- 可拖拽的页面裂缝，以及 HTML 面板与 WebGL 场景同步展开的连续转场
+- React Three Fiber 程序化走廊、UI 碎片、空间粒子与行为生成数字生命体
+- Low / Medium / High 自动质量分级、DPR 与粒子数量降级
+- 触摸屏布局、键盘操作、清晰焦点与 `prefers-reduced-motion`
+- 运行时错误恢复界面
+
+## 数据与素材
+
+项目不要求登录，不采集真实身份信息，不向服务器上传行为数据。行为痕迹仅写入当前浏览器的 `localStorage`。
+
+视觉与声音均使用 CSS、Three.js 几何体、程序化粒子和 Web Audio API 生成，不含外部图片、模型、音乐或音效。
+
+## 后续阶段
+
+当前版本以 “CONTINUE DEVELOPMENT” 结束。完整的第六章逃离序列、最终高分辨率数字身份卡、PNG 导出与分享链接将在下一阶段实现。更高成本的屏幕空间折射、Shader 变形、后处理和高级空间音频也应在性能分析后逐步加入。
