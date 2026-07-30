@@ -36,3 +36,13 @@ export interface DeviceProfile {
   reducedMotion: boolean;
   coarsePointer: boolean;
 }
+
+export interface ExperienceSnapshot {
+  version: 1;
+  savedAt: number;
+  chapter: Chapter;
+  anomaly: number;
+  fractureProgress: number;
+  muted: boolean;
+  metrics: InteractionMetrics;
+}

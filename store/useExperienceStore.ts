@@ -4,6 +4,7 @@ import { create } from "zustand";
 import type {
   Chapter,
   DeviceProfile,
+  ExperienceSnapshot,
   InteractionMetrics,
   Point,
   QualityLevel,
@@ -40,6 +41,7 @@ interface ExperienceState {
   setFractureProgress: (progress: number) => void;
   setMuted: (muted: boolean) => void;
   setDevice: (quality: QualityLevel, reducedMotion: boolean, coarsePointer: boolean) => void;
+  restoreSession: (snapshot: ExperienceSnapshot) => void;
   begin: () => void;
   recordPointer: (
     point: Point,
@@ -75,6 +77,24 @@ export const useExperienceStore = create<ExperienceState>((set) => ({
   setMuted: (muted) => set({ muted }),
   setDevice: (quality, reducedMotion, coarsePointer) =>
     set({ device: { quality, reducedMotion, coarsePointer } }),
+  restoreSession: (snapshot) =>
+    set({
+      chapter: snapshot.chapter,
+      anomaly: snapshot.anomaly,
+      fractureProgress: snapshot.fractureProgress,
+      muted: snapshot.muted,
+      startedAt: Date.now() - snapshot.metrics.dwellTime * 1000,
+      metrics: {
+        ...snapshot.metrics,
+        pointer: { ...snapshot.metrics.pointer },
+        clickPositions: snapshot.metrics.clickPositions.map((point) => ({
+          ...point,
+        })),
+        pointerTrail: snapshot.metrics.pointerTrail.map((point) => ({
+          ...point,
+        })),
+      },
+    }),
   begin: () =>
     set((state) => ({
       startedAt: state.startedAt || Date.now(),

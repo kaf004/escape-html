@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useExperienceStore } from "../../store/useExperienceStore";
-import { audioEngine } from "../../systems/audioEngine";
 import type { Chapter } from "../../types/experience";
 
 const chapterNumbers: Record<Chapter, string> = {
@@ -26,7 +25,11 @@ export function ExperienceHud() {
   if (chapter === "interface" || chapter === "escape") return null;
 
   return (
-    <aside className="experience-hud" aria-label="Experience controls">
+    <aside
+      className="experience-hud"
+      aria-label="Experience controls"
+      data-system-control
+    >
       <button
         className="hud-mark"
         onClick={() => setControlsOpen((value) => !value)}
@@ -46,7 +49,6 @@ export function ExperienceHud() {
           onClick={() => {
             const next = !muted;
             setMuted(next);
-            audioEngine.setMuted(next);
           }}
           aria-pressed={muted}
         >

@@ -111,3 +111,51 @@ test("ships the adaptive immersion rendering and spatial audio stage", async () 
   assert.match(interaction, /audioEngine\.pulse\(0\.45, point\)/);
   assert.match(experience, /audioEngine\.setScene\(chapter\)/);
 });
+
+test("ships the local continuity and checkpoint recovery stage", async () => {
+  const [persistence, interaction, experience, recovery, store, escape] =
+    await Promise.all([
+      readFile(
+        new URL("../systems/sessionPersistence.ts", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../systems/InteractionEngine.tsx", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../components/experience/EscapeExperience.tsx", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../components/ui/TraceRecovery.tsx", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../store/useExperienceStore.ts", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../components/chapters/EscapeChapter.tsx", import.meta.url),
+        "utf8",
+      ),
+    ]);
+
+  assert.match(persistence, /escape-html-session-v1/);
+  assert.match(persistence, /7 \* 24 \* 60 \* 60 \* 1000/);
+  assert.match(persistence, /sanitizeMetrics/);
+  assert.match(persistence, /LEGACY_STORAGE_KEY/);
+  assert.match(interaction, /saveSessionSnapshot/);
+  assert.match(interaction, /pagehide/);
+  assert.match(interaction, /visibilitychange/);
+  assert.match(interaction, /data-system-control/);
+  assert.match(experience, /loadSessionSnapshot/);
+  assert.match(experience, /<TraceRecovery/);
+  assert.match(experience, /restoreSession\(recovery\)/);
+  assert.match(recovery, /role="dialog"/);
+  assert.match(recovery, /aria-modal="true"/);
+  assert.match(recovery, /RESUME TRACE/);
+  assert.match(recovery, /ERASE &amp; START AGAIN/);
+  assert.match(store, /restoreSession:/);
+  assert.match(escape, /clearSessionSnapshot\(\)/);
+});

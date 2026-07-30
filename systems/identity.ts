@@ -68,7 +68,7 @@ export function createIdentityProfile(
       metrics.clicks,
       metrics.dwellTime,
     ),
-    signature: `${(hash % 0xffffff).toString(16).toUpperCase().padStart(6, "0")}–${(
+    signature: `${(hash % 0xffffff).toString(16).toUpperCase().padStart(6, "0")}—${(
       (hash >>> 8) %
       0xffff
     )

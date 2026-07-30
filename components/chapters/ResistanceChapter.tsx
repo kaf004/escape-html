@@ -13,7 +13,8 @@ const warningSequence = [
 ];
 
 export function ResistanceChapter() {
-  const [provocation, setProvocation] = useState(0);
+  const anomaly = useExperienceStore((state) => state.anomaly);
+  const [provocation, setProvocation] = useState(() => Math.round(anomaly * 4));
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [reply, setReply] = useState("");
   const pointerSpeed = useExperienceStore((state) => state.metrics.pointerSpeed);

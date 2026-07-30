@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useExperienceStore } from "../store/useExperienceStore";
 import type { QualityLevel } from "../types/experience";
 import { audioEngine } from "./audioEngine";
+import { saveSessionSnapshot } from "./sessionPersistence";
 
 interface NavigatorWithMemory extends Navigator {
   deviceMemory?: number;
@@ -76,6 +77,12 @@ export function InteractionEngine() {
     };
 
     const onClick = (event: MouseEvent) => {
+      if (
+        event.target instanceof Element &&
+        event.target.closest("[data-system-control]")
+      ) {
+        return;
+      }
       const point = {
         x: event.clientX / window.innerWidth,
         y: event.clientY / window.innerHeight,
@@ -91,30 +98,36 @@ export function InteractionEngine() {
 
     const onFocus = () => setFocused(true);
     const onBlur = () => setFocused(false);
+    const persist = () => {
+      const state = useExperienceStore.getState();
+      if (!state.startedAt || state.chapter === "interface") return;
+      saveSessionSnapshot({
+        chapter: state.chapter,
+        anomaly: state.anomaly,
+        fractureProgress: state.fractureProgress,
+        muted: state.muted,
+        metrics: state.metrics,
+      });
+    };
+
     const dwellTimer = window.setInterval(() => {
       tickDwell();
-      const state = useExperienceStore.getState();
-      try {
-        localStorage.setItem(
-          "escape-html-trace",
-          JSON.stringify({
-            chapter: state.chapter,
-            metrics: state.metrics,
-            quality: state.device.quality,
-          }),
-        );
-      } catch {
-        // Local storage is an enhancement; the experience remains fully playable.
-      }
+      persist();
     }, 1000);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") persist();
+    };
 
     window.addEventListener("pointermove", onPointerMove, { passive: true });
     window.addEventListener("click", onClick);
     window.addEventListener("wheel", onWheel, { passive: true });
     window.addEventListener("focus", onFocus);
     window.addEventListener("blur", onBlur);
+    window.addEventListener("pagehide", persist);
+    document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
+      persist();
       cancelAnimationFrame(frame);
       clearInterval(dwellTimer);
       window.removeEventListener("pointermove", onPointerMove);
@@ -122,6 +135,8 @@ export function InteractionEngine() {
       window.removeEventListener("wheel", onWheel);
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("blur", onBlur);
+      window.removeEventListener("pagehide", persist);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [recordClick, recordPointer, recordScroll, setFocused, tickDwell]);
 

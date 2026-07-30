@@ -17,6 +17,7 @@ import {
   encodeIdentityProfile,
   type IdentityProfile,
 } from "../../systems/identity";
+import { clearSessionSnapshot } from "../../systems/sessionPersistence";
 
 type EscapePhase = "threshold" | "release" | "identity";
 
@@ -424,12 +425,14 @@ export function EscapeChapter() {
             <button
               type="button"
               onClick={() => {
+                if (!sharedProfile) clearSessionSnapshot();
                 reset();
                 window.history.replaceState({}, "", window.location.pathname);
                 setChapter("interface");
               }}
             >
-              ERASE &amp; RE-ENTER <span>NEW TRACE</span>
+              {sharedProfile ? "BEGIN YOUR TRACE" : "ERASE & RE-ENTER"}{" "}
+              <span>NEW TRACE</span>
             </button>
           </div>
         </footer>

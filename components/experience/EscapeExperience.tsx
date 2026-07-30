@@ -1,10 +1,15 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { type CSSProperties, useEffect } from "react";
+import { type CSSProperties, useEffect, useState } from "react";
 import { useExperienceStore } from "../../store/useExperienceStore";
 import { InteractionEngine } from "../../systems/InteractionEngine";
 import { audioEngine } from "../../systems/audioEngine";
+import {
+  clearSessionSnapshot,
+  loadSessionSnapshot,
+} from "../../systems/sessionPersistence";
+import type { ExperienceSnapshot } from "../../types/experience";
 import { BreakPageChapter } from "../chapters/BreakPageChapter";
 import { ControlTestChapter } from "../chapters/ControlTestChapter";
 import { EscapeChapter } from "../chapters/EscapeChapter";
@@ -13,6 +18,7 @@ import { InterfaceChapter } from "../chapters/InterfaceChapter";
 import { ResistanceChapter } from "../chapters/ResistanceChapter";
 import { ExperienceHud } from "../ui/ExperienceHud";
 import { PointerField } from "../ui/PointerField";
+import { TraceRecovery } from "../ui/TraceRecovery";
 
 const DigitalWorld = dynamic(
   () => import("../canvas/DigitalWorld").then((module) => module.DigitalWorld),
@@ -24,19 +30,33 @@ export function EscapeExperience() {
   const anomaly = useExperienceStore((state) => state.anomaly);
   const fractureProgress = useExperienceStore((state) => state.fractureProgress);
   const reducedMotion = useExperienceStore((state) => state.device.reducedMotion);
+  const muted = useExperienceStore((state) => state.muted);
   const setChapter = useExperienceStore((state) => state.setChapter);
+  const restoreSession = useExperienceStore((state) => state.restoreSession);
+  const reset = useExperienceStore((state) => state.reset);
+  const [recovery, setRecovery] = useState<ExperienceSnapshot | null>(null);
   const worldActive =
     chapter === "break" || chapter === "inside" || chapter === "escape";
 
   useEffect(() => {
     if (new URLSearchParams(window.location.search).has("trace")) {
       setChapter("escape");
+      return;
     }
+
+    const snapshot = loadSessionSnapshot();
+    if (!snapshot || snapshot.chapter === "interface") return;
+    const frame = requestAnimationFrame(() => setRecovery(snapshot));
+    return () => cancelAnimationFrame(frame);
   }, [setChapter]);
 
   useEffect(() => {
     audioEngine.setScene(chapter);
   }, [chapter]);
+
+  useEffect(() => {
+    audioEngine.setMuted(muted);
+  }, [muted]);
 
   return (
     <main
@@ -66,6 +86,21 @@ export function EscapeExperience() {
       </div>
 
       <ExperienceHud />
+      {recovery && (
+        <TraceRecovery
+          snapshot={recovery}
+          onResume={() => {
+            restoreSession(recovery);
+            void audioEngine.start();
+            setRecovery(null);
+          }}
+          onRestart={() => {
+            clearSessionSnapshot();
+            reset();
+            setRecovery(null);
+          }}
+        />
+      )}
       <p className="sr-only" aria-live="polite">
         Current chapter: {chapter}.
       </p>
